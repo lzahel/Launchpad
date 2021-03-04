@@ -1,3 +1,3 @@
 # Launchpad
 
-Building a Confluence Page with an additional Makro-Template
+Building a Confluence-page with an additional Makro-Template
