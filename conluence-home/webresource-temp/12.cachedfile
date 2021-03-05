@@ -1,0 +1,158 @@
+WRMCB=function(e){var c=console;if(c&&c.log&&c.error){c.log('Error running batched script.');c.error(e);}}
+;
+try {
+/* module-key = 'com.atlassian.confluence.plugins.confluence-baseurl-plugin:baseurl-resource', location = 'js/baseurl-checker.js' */
+define('baseurl-checker', ['jquery', 'window', 'ajs', 'confluence/meta'], function ($, window, AJS, Meta) {
+    'use strict';
+
+    var BaseUrlProxyConfigCheck = {
+        performCheck: function () {
+            if (!this.isDisplayed()) {
+                var requestUrl = this.constructRequestUrl();
+                var serverUrl = this.constructServerUrl();
+                var baseUrl = this.parseURL(Meta.get('base-url'));
+
+                if (baseUrl.href !== requestUrl.href) {
+                    this.showWrongBaseUrlFlag(this.linkFor(baseUrl), this.linkFor(requestUrl));
+                } else if (serverUrl && serverUrl.href !== requestUrl.href) {
+                    this.showWrongConfigFlag(requestUrl);
+                }
+            }
+        },
+
+        isDisplayed: function () {
+            return !!$('#base-url-banner').length;
+        },
+
+        showWrongBaseUrlFlag: function (baseUrlLink, requestUrlLink) {
+            var title = "URL stimmt nicht \u00fcberein";
+            var link = this.constructFlagLink(AJS.contextPath() + '/admin/editgeneralconfig.action', "Basis-URL aktualisieren");
+            var body = AJS.format("Basis-URL von Confluence ist auf {0} festgesetzt, aber Sie greifen auf Confluence \u00fcber {1} zu.", baseUrlLink, requestUrlLink) + '<p>' + link + '</p>';
+            var clickEvent = 'confluence.base.url.plugin.banner.update';
+            var closeEvent = 'no-match';
+
+            this.showWarningFlag(title, body, clickEvent, closeEvent);
+        },
+
+        showWrongConfigFlag: function (requestUrl) {
+            var title = "Tomcat-Konfiguration ist falsch";
+            var link = this.constructFlagLink('https://confluence.atlassian.com/x/IfcCO', "Fehlerbehebung");
+            var body = "Die Tomcat server.xml-Datei weist eine falsche Konfiguration auf:" + this.constructConfigProblems(requestUrl) + '<p>' + link + '</p>';
+            var clickEvent = 'confluence.base.url.plugin.banner.troubleshoot';
+            var closeEvent = 'cant-check-proxy';
+
+            this.showWarningFlag(title, body, clickEvent, closeEvent);
+        },
+
+        showWarningFlag: function (title, body, clickEvent, closeEvent) {
+            if (this.isDisplayed()) {
+                return;
+            }
+            var flagElement = AJS.flag({
+                type: 'warning',
+                title: title,
+                body: body
+            });
+            var $flagElement = $(flagElement);
+
+            $flagElement.find('#base-url-proxy-config-fix').click(function (e) {
+                AJS.trigger('analyticsEvent', {name: clickEvent});
+            });
+
+            $flagElement.data('type', closeEvent);
+            $flagElement.data('base-url-flag', true);
+            $flagElement.data('openTime', (new Date()).getTime());
+
+            flagElement.addEventListener('aui-flag-close', BaseUrlProxyConfigCheck.sendAnalyticsOnClose);
+
+            AJS.trigger('analyticsEvent', {
+                name: 'confluence.base.url.plugin.banner.open',
+                data: {
+                    type: $flagElement.data('type'),
+                    openTime: $flagElement.data('openTime')
+                }
+            });
+        },
+
+        sendAnalyticsOnClose: function (event) {
+            var flagElement = event.target;
+            var $flagElement = $(flagElement);
+            
+            if ($flagElement.data('base-url-flag') === false) {
+                return;
+            }
+
+            AJS.trigger('analyticsEvent', {
+                name: 'confluence.base.url.plugin.banner.close',
+                data: {
+                    type: $flagElement.data('type'),
+                    flagOpenFor: (new Date()).getTime() - $flagElement.data('openTime')
+                }
+            });
+
+            flagElement.removeEventListener('aui-flag-close', BaseUrlProxyConfigCheck.sendAnalyticsOnClose)
+        },
+
+        constructConfigProblems: function (requestUrl) {
+            return '<p>' +
+                this.constructConfigProblemItem('scheme', requestUrl.scheme) + '<br/>' +
+                this.constructConfigProblemItem('proxyName', requestUrl.host) + '<br/>' +
+                this.constructConfigProblemItem('proxyPort', requestUrl.port) +
+                '</p>';
+        },
+
+        constructConfigProblemItem: function (subject, value) {
+            return AJS.format("{0} sollte {1} sein", '<strong>' + subject + '</strong>', '\'' + value + '\'');
+        },
+
+        constructFlagLink: function (href, linkText) {
+            return '<a target="_blank" href="' + href + '"' + ' class="aui-button aui-button-link" id="base-url-proxy-config-fix">' + linkText + '</a>';
+        },
+
+        constructRequestUrl: function () {
+            return this.parseURL(window.location.protocol + '//' + window.location.host + AJS.contextPath());
+        },
+
+        constructServerUrl: function () {
+            return this.parseURL(Meta.get('server-scheme') + '://' + Meta.get('server-name') +
+                (Meta.get('server-port') ? ':' + Meta.get('server-port') : '') + AJS.contextPath());
+        },
+
+        linkFor: function (url) {
+            return AJS.format('<a href="{0}">{0}</a>', url.href);
+        },
+
+        parseURL: function (url) {
+            var pattern = RegExp("^(([^:/?#]+):)?(//([^:/?#]*))?(:([0-9]*))?([^?#]*)(\\?([^#]*))?(#(.*))?");
+            var matches = url.toLowerCase().match(pattern);
+            var result = {
+                scheme: matches[2],
+                host: matches[4],
+                port: matches[6],
+                path: matches[7],
+                query: matches[8],
+                fragment: matches[10]
+            };
+            result.port = matches[6] || (result.scheme === 'http' ? '80' : '443');
+            result.href = result.scheme + '://' + result.host +
+                (((result.scheme === 'https' && result.port === '443') ||
+                    (result.scheme === 'http' && result.port === '80')) ? '' : ':' + result.port) +
+                (result.path || '') + (result.query || '') + (result.fragment || '');
+
+            return result;
+        }
+    };
+
+    return BaseUrlProxyConfigCheck;
+});
+
+}catch(e){WRMCB(e)};
+;
+try {
+/* module-key = 'com.atlassian.confluence.plugins.confluence-baseurl-plugin:baseurl-resource', location = 'js/init.js' */
+require(['baseurl-checker', 'jquery'], function(BaseUrlProxyConfigCheck, $) {
+    $(function () {
+        BaseUrlProxyConfigCheck.performCheck();
+    });
+});
+}catch(e){WRMCB(e)};

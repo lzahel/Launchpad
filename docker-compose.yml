@@ -1,0 +1,35 @@
+version: "3.7"
+
+services:
+  postgres:
+    container_name:  postgresDB
+    image: postgres
+    restart: always
+    networks: 
+      - confluencenet
+    volumes: 
+      - ./postgressql:/var/lib/postgresql
+    environment: 
+      - POSTGRES_DB=confluence
+      - POSTGRES_USER=confluence
+      - POSTGRES_PASSWORD=confluence
+      - POSTGRES_ENCODING=UNICODE
+      - POSTGRES_COLLATE=C
+      - POSTGRES_COLLATE_TYPE=C
+      
+
+  confluence:
+    container_name: confluenceServer
+    image: atlassian/confluence-server
+    restart: always
+    networks: 
+      - confluencenet
+    volumes:
+      - ./conluence-home:/var/atlassian/application-data/confluence
+    ports:
+      - 8090:8090
+      - 8091:8091
+networks: 
+    confluencenet: {}
+
+# db login: confluence / password: confluence
